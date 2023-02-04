@@ -1,37 +1,40 @@
 package org.example;
 
 import java.util.*;
+import java.util.concurrent.*;
 
 public class Main {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         String[] texts = new String[25];
         for (int i = 0; i < texts.length; i++) {
             texts[i] = generateText("aab", 30_000);
         }
 
-        long startTs = System.currentTimeMillis(); // start time
-        for (String text : texts) {
-            ineffectiveAlgo(text);
-        }
-        long endTs = System.currentTimeMillis(); // end time
-        System.out.println("Time: " + (endTs - startTs) + "ms");
 
         // мутим потоки
-        List<Thread> threads = new ArrayList<>();
+        ExecutorService threadPool = Executors.newFixedThreadPool(10);
+        List<Future<Integer>> tasks = new ArrayList<>();
         long startTsMulti = System.currentTimeMillis(); // start time
 
         for (String text : texts) {
-            Runnable searchLogic = () -> ineffectiveAlgo(text);
-            Thread thread = new Thread(searchLogic);
-            threads.add(thread);
-            thread.start();
+            Callable<Integer> searchLogic = () -> ineffectiveAlgoResult(text);
+            Future<Integer> task = threadPool.submit(searchLogic);
+            tasks.add(task);
+
         }
-        for (Thread thread : threads) {
-            thread.join(); // зависаем, ждём когда поток объект которого лежит в thread завершится
+        int finalResult = 0;
+        for (Future<Integer> task : tasks) {
+            Integer resultOfTask = task.get();
+            if (resultOfTask > finalResult) {
+                finalResult = resultOfTask;
+            }
+
         }
         long endTsMulti = System.currentTimeMillis(); // end time
         System.out.println("Time: " + (endTsMulti - startTsMulti) + "ms");
+        System.out.println("Max interval is " + finalResult);
+        threadPool.shutdown();
     }
 
     public static String generateText(String letters, int length) {
@@ -43,7 +46,7 @@ public class Main {
         return text.toString();
     }
 
-    public static void ineffectiveAlgo(String text) {
+    public static Integer ineffectiveAlgoResult(String text) {
         int maxSize = 0;
         int iStart = 0; // добавлено
         for (int i = 0; i < text.length(); i++) {
@@ -65,5 +68,6 @@ public class Main {
             }
         }
         System.out.println(text.substring(0, 100) + "... -> " + maxSize + " начиная с " + iStart); // дополнено
+        return maxSize;
     }
 }
